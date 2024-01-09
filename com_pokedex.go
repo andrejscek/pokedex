@@ -12,8 +12,8 @@ func commandPokedex(cfg *config, args ...string) error {
 	}
 
 	fmt.Println("Your Pokedex:")
-	for k in cfg.caughtPokemon {
-		fmt.Println("  -%s", k)
+	for _, k := range cfg.caughtPokemon {
+		fmt.Printf(" - %s\n", k.Name)
 	}
 
 	return nil
