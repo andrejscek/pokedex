@@ -1,105 +1,134 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/andrejscek/pokedex/internal/pokeapi"
+	"github.com/paulrademacher/climenu"
 )
 
-type config struct {
-	pokeapiClient    pokeapi.Client
-	nextLocationsURL *string
-	prevLocationsURL *string
-	caughtPokemon    map[string]pokeapi.Pokemon
+func exploreLoc(cfg *config, location string) {
+	fmt.Println()
+	pokes, err := commandExplore(cfg, location)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	for {
+		menu := climenu.NewButtonMenu("Explore", "Select pokemon to try and catch it, Esc to go back")
+		for _, k := range pokes {
+			menu.AddMenuItem(k, k)
+		}
+		pokemon, escaped := menu.Run()
+		if escaped {
+			return
+		}
+		commandCatch(cfg, pokemon)
+		fmt.Println()
+	}
+
 }
 
-func startRepl(cfg *config) {
-	reader := bufio.NewScanner(os.Stdin)
+func exploreMap(cfg *config) {
+	locations, err := commandMapf(cfg)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println()
+		return
+	}
 	for {
-		fmt.Print("Pokedex > ")
-		reader.Scan()
-
-		words := cleanInput(reader.Text())
-		if len(words) == 0 {
-			continue
+		menu := climenu.NewButtonMenu("Explore", "Select location to explore it, Esc to go back")
+		menu.AddMenuItem("Next page", "map")
+		menu.AddMenuItem("Previous page", "mapb")
+		for _, k := range locations {
+			menu.AddMenuItem(k, k)
 		}
-
-		commandName := words[0]
-		args := []string{}
-		if len(words) > 1 {
-			args = words[1:]
+		selection, escaped := menu.Run()
+		if escaped {
+			break
 		}
-
-		command, exists := getCommands()[commandName]
-		if exists {
-			err := command.callback(cfg, args...)
+		switch selection {
+		case "map":
+			new_loc, err := commandMapf(cfg)
 			if err != nil {
 				fmt.Println(err)
+				fmt.Println()
+				continue
 			}
-			continue
-		} else {
-			fmt.Println("Unknown command")
-			continue
+			locations = new_loc
+		case "mapb":
+			new_loc, err := commandMapb(cfg)
+			if err != nil {
+				fmt.Println(err)
+				fmt.Println()
+				continue
+			}
+			locations = new_loc
+		default:
+			exploreLoc(cfg, selection)
 		}
+
 	}
 }
 
-func cleanInput(text string) []string {
-	output := strings.ToLower(text)
-	words := strings.Fields(output)
-	return words
-}
+func startRepl(cfg *config) {
 
-type cliCommand struct {
-	name        string
-	description string
-	callback    func(*config, ...string) error
-}
+	for {
 
-func getCommands() map[string]cliCommand {
-	return map[string]cliCommand{
-		"help": {
-			name:        "help",
-			description: "Displays a help message",
-			callback:    commandHelp,
-		},
-		"explore": {
-			name:        "explore <location_name>",
-			description: "Explore a location",
-			callback:    commandExplore,
-		},
-		"catch": {
-			name:        "catch <pokemon_name>",
-			description: "Attempt to catch a pokemon",
-			callback:    commandCatch,
-		},
-		"inspect": {
-			name:        "inspect <pokemon_name>",
-			description: "Show information about a caught pokemon",
-			callback:    commandInspect,
-		},
-		"pokedex": {
-			name:        "pokedex",
-			description: "Show all caught pokemon",
-			callback:    commandPokedex,
-		},
-		"map": {
-			name:        "map",
-			description: "Get the next page of locations",
-			callback:    commandMapf,
-		},
-		"mapb": {
-			name:        "mapb",
-			description: "Get the previous page of locations",
-			callback:    commandMapb,
-		},
-		"exit": {
-			name:        "exit",
-			description: "Exit the Pokedex",
-			callback:    commandExit,
-		},
+		menu := climenu.NewButtonMenu("\n\nPokedex main menu", "Enter to choose an action, Esc to exit")
+		menu.AddMenuItem("My Pokemons", "pokedex")
+		menu.AddMenuItem("Explore", "map")
+		menu.AddMenuItem("Explore custom location", "explore")
+		menu.AddMenuItem("Save", "save")
+		menu.AddMenuItem("Load", "load")
+
+		action, escaped := menu.Run()
+		if escaped {
+			os.Exit(0)
+		}
+
+		switch action {
+		case "pokedex":
+
+			if len(cfg.caughtPokemon) == 0 {
+				fmt.Println()
+				fmt.Println("You have not caught any pokemon yet")
+				fmt.Println()
+				continue
+			}
+
+			menu := climenu.NewButtonMenu("My Pokemons", "Select pokemon to inspect it, Esc to go back")
+			for _, k := range cfg.caughtPokemon {
+				menu.AddMenuItem(k.Name, k.Name)
+			}
+			pokemon, escaped := menu.Run()
+			if escaped {
+				continue
+			}
+			commandInspect(cfg, pokemon)
+			fmt.Println()
+
+		case "map":
+			exploreMap(cfg)
+
+		case "explore":
+			response := climenu.GetText("Enter custom location to explore", "location name")
+			exploreLoc(cfg, response)
+
+		case "save":
+			err := saveConfigToFile(cfg, configFilename)
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Println("Saved!")
+			}
+		case "load":
+			err := loadConfigFromFile(cfg, configFilename)
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Println("Loaded!")
+			}
+		}
 	}
 }

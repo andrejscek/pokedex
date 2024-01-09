@@ -1,20 +1,15 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 )
 
-func commandCatch(cfg *config, args ...string) error {
-	if len(args) != 1 {
-		return errors.New("you must provide a pokemon name")
-	}
+func commandCatch(cfg *config, name string) (bool, error) {
 
-	name := args[0]
 	pokemon, err := cfg.pokeapiClient.GetPokemon(name)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	res := rand.Intn(pokemon.BaseExperience)
@@ -22,12 +17,12 @@ func commandCatch(cfg *config, args ...string) error {
 	fmt.Printf("Trowing Pokebal to catch %s...\n", pokemon.Name)
 	if res > 40 {
 		fmt.Println("Pokemon escaped!")
-		return nil
+		return false, nil
 	}
 
 	fmt.Printf("%s caught! You can now inspect it with inspect command\n", pokemon.Name)
 	cfg.caughtPokemon[pokemon.Name] = pokemon
 
-	return nil
+	return true, nil
 
 }
